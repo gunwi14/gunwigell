@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="board-title">게시판</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <a href="index.html" class="back-link">←</a>
+        <div class="board-info">
+            <h1 id="header-category">자유 게시판</h1>
+            <p>군위고 익명 게시판</p>
+        </div>
+        <span class="write-button" onclick="showWriteForm()">✏️</span>
+        <span class="search-icon">🔍</span>
+    </header>
+
+    <main class="post-container">
+        <div id="posts-list">
+            </div>
+
+        <div id="write-form-overlay" class="overlay" style="display:none;">
+            <div class="write-form-box">
+                <h2>새 글 작성</h2>
+                <input type="text" id="post-title" placeholder="제목을 입력하세요 (익명)" required>
+                <textarea id="post-content" placeholder="내용을 입력하세요..." required></textarea>
+                <div class="form-actions">
+                    <button onclick="hideWriteForm()" class="cancel-btn">취소</button>
+                    <button onclick="submitPost()">등록하기</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="comment-overlay" class="overlay" style="display:none;">
+            <div class="comment-box">
+                <button class="close-btn" onclick="hideCommentOverlay()">X</button>
+                <div id="current-post-view">
+                    </div>
+                <div id="comments-list">
+                    </div>
+                <div class="comment-input-area">
+                    <input type="text" id="comment-input" placeholder="댓글을 남겨보세요 (익명)">
+                    <button onclick="submitComment()">등록</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 게시글 데이터를 로컬 저장소에서 관리합니다.
+        const categoryMap = {
+            'free': '자유 게시판',
+            'hobby': '취미/스포츠',
+            'school': '학교/학업',
+            'qna': '질문/답변'
+        };
+
+        let currentCategory = 'free';
+        let currentPostId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const cat = params.get('category');
+            if (cat && categoryMap[cat]) {
+                currentCategory = cat;
+                document.getElementById('header-category').textContent = categoryMap[cat];
+                document.getElementById('board-title').textContent = categoryMap[cat] + ' - 군위고';
+            }
+            loadPosts();
+        });
+
+        // 로컬 스토리지에서 게시글 목록을 가져옵니다.
+        function getPosts() {
+            const key = `gunwi_posts_${currentCategory}`;
+            return JSON.parse(localStorage.getItem(key)) || [];
+        }
+
+        // 로컬 스토리지에 게시글 목록을 저장합니다.
+        function savePosts(posts) {
+            const key = `gunwi_posts_${currentCategory}`;
+            localStorage.setItem(key, JSON.stringify(posts));
+        }
+
+        // 게시글 목록을 화면에 렌더링합니다.
+        function loadPosts() {
+            const posts = getPosts();
+            const listElement = document.getElementById('posts-list');
+            listElement.innerHTML = '';
+            
+            if (posts.length === 0) {
+                listElement.innerHTML = '<p class="no-posts">아직 게시글이 없습니다. 첫 글을 작성해 보세요!</p>';
+                return;
+            }
+
+            posts.sort((a, b) => b.id - a.id); // 최신 글이 위로 오도록 정렬
+
+            posts.forEach(post => {
+                const postElement = document.createElement('article');
+                postElement.classList.add('post-summary');
+                postElement.setAttribute('data-post-id', post.id);
+                
+                const commentCount = post.comments ? post.comments.length : 0;
+                
+                postElement.innerHTML = `
+                    <div class="post-header">
+                        <span class="post-author">익명${post.anonId}</span>
+                        <span class="post-meta-right">⋮</span>
+                    </div>
+                    <h3 class="post-summary-title">${post.title}</h3>
+                    <p class="post-summary-content">${post.content.substring(0, 50)}...</p>
+                    <div class="post-meta">
+                        <span class="timestamp">${post.date}</span>
+                        <span class="views">💬 ${commentCount}</span>
+                    </div>
+                `;
+                postElement.onclick = () => showCommentOverlay(post.id);
+                listElement.appendChild(postElement);
+            });
+        }
+
+        // 새 글 작성 폼을 표시합니다.
+        function showWriteForm() {
+            document.getElementById('write-form-overlay').style.display = 'flex';
+        }
+
+        // 새 글 작성 폼을 숨깁니다.
+        function hideWriteForm() {
+            document.getElementById('write-form-overlay').style.display = 'none';
+            document.getElementById('post-title').value = '';
+            document.getElementById('post-content').value = '';
+        }
+
+        // 게시글을 등록하고 저장합니다.
+        function submitPost() {
+            const title = document.getElementById('post-title').value.trim();
+            const content = document.getElementById('post-content').value.trim();
+
+            if (!title || !content) {
+                alert('제목과 내용을 모두 입력해 주세요.');
+                return;
+            }
+
+            let posts = getPosts();
+            const nextId = posts.length > 0 ? Math.max(...posts.map(p => p.id)) + 1 : 1;
+            
+            // 모든 게시판 통틀어 가장 큰 익명 번호를 찾기 위한 임시 로직
+            const allPostsData = Object.keys(localStorage)
+                .filter(key => key.startsWith('gunwi_posts_'))
+                .flatMap(key => JSON.parse(localStorage.getItem(key)));
+            
+            const maxAnonId = allPostsData.reduce((max, post) => Math.max(max, post.anonId || 0), 0);
+            
+            const newPost = {
+                id: nextId,
+                anonId: maxAnonId + 1, // 새로운 익명 번호 부여
+                title: title,
+                content: content,
+                date: new Date().toLocaleDateString().slice(0, -1), // 예: 2025. 12. 16
+                comments: []
+            };
+
+            posts.push(newPost);
+            savePosts(posts);
+            
+            hideWriteForm();
+            loadPosts(); // 목록 새로고침
+        }
+
+        // 댓글 오버레이 표시 (게시글 상세 보기)
+        function showCommentOverlay(postId) {
+            currentPostId = postId;
+            const posts = getPosts();
+            const post = posts.find(p => p.id === postId);
+
+            if (!post) return;
+
+            // 게시글 상세 내용 렌더링
+            document.getElementById('current-post-view').innerHTML = `
+                <h3 class="detail-title">${post.title}</h3>
+                <div class="detail-meta">
+                    <span>익명${post.anonId}</span> | <span>${post.date}</span>
+                </div>
+                <p class="detail-content">${post.content.replace(/\n/g, '<br>')}</p>
+                <hr>
+            `;
+            
+            // 댓글 목록 렌더링
+            renderComments(post.comments);
+
+            document.getElementById('comment-overlay').style.display = 'flex';
+        }
+
+        // 댓글 목록 렌더링 함수
+        function renderComments(comments) {
+            const commentsList = document.getElementById('comments-list');
+            commentsList.innerHTML = '';
+
+            if (comments.length === 0) {
+                commentsList.innerHTML = '<p class="no-comments">아직 댓글이 없습니다.</p>';
+                return;
+            }
+
+            comments.forEach(comment => {
+                const commentElement = document.createElement('div');
+                commentElement.classList.add('comment-reply');
+                commentElement.innerHTML = `
+                    <div class="reply-header">
+                        <span class="reply-user-id">익명${comment.anonId}</span>
+                        <span class="reply-meta">${comment.time}</span>
+                    </div>
+                    <p class="reply-content">${comment.content}</p>
+                `;
+                commentsList.appendChild(commentElement);
+            });
+        }
+
+        // 댓글 오버레이 숨기기
+        function hideCommentOverlay() {
+            document.getElementById('comment-overlay').style.display = 'none';
+            document.getElementById('comment-input').value = '';
+            currentPostId = null;
+        }
+
+        // 댓글 등록 및 저장
+        function submitComment() {
+            const commentInput = document.getElementById('comment-input');
+            const commentContent = commentInput.value.trim();
+
+            if (!commentContent) return;
+
+            let posts = getPosts();
+            const postIndex = posts.findIndex(p => p.id === currentPostId);
+            
+            if (postIndex === -1) return;
+
+            // 모든 게시판의 모든 댓글 익명 ID 중 최대값을 찾아 다음 번호 부여
+            const allData = Object.keys(localStorage)
+                .filter(key => key.startsWith('gunwi_posts_'))
+                .flatMap(key => JSON.parse(localStorage.getItem(key)));
+
+            const allComments = allData.flatMap(post => post.comments || []);
+            const allPosts = allData;
+
+            const maxCommentAnonId = allComments.reduce((max, comment) => Math.max(max, comment.anonId || 0), 0);
+            const maxPostAnonId = allPosts.reduce((max, post) => Math.max(max, post.anonId || 0), 0);
+            
+            const nextAnonId = Math.max(maxCommentAnonId, maxPostAnonId) + 1;
+
+            const now = new Date();
+            const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const newComment = {
+                anonId: nextAnonId,
+                content: commentContent,
+                time: time
+            };
+
+            posts[postIndex].comments.push(newComment);
+            savePosts(posts);
+
+            // 화면 갱신
+            renderComments(posts[postIndex].comments);
+            commentInput.value = '';
+            loadPosts(); // 메인 목록의 댓글 수도 갱신
+        }
+    </script>
+</body>
+</html>
