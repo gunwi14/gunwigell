@@ -2,27 +2,40 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>군위고 커뮤니티</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header class="header">
-        <h1>군위고 익명 게시판</h1>
+        <h2>🏫 군위고 라이프</h2>
+        <span style="font-size:12px; color:#888;">Beta</span>
     </header>
 
-    <main class="menu-container">
-        <a href="board.html?category=free" class="menu-item">
-            <span class="icon">💬</span> 자유
+    <main class="menu-grid">
+        <a href="board.html?category=free" class="menu-card">
+            <div class="menu-icon">💬</div>
+            <div class="menu-title">자유게시판</div>
         </a>
-        <a href="board.html?category=school" class="menu-item">
-            <span class="icon">🏫</span> 학교/학업
+        <a href="board.html?category=school" class="menu-card">
+            <div class="menu-icon">📚</div>
+            <div class="menu-title">학교/학업</div>
         </a>
-        <a href="board.html?category=game" class="menu-item">
-            <span class="icon">🎮</span> 게임
+        <a href="board.html?category=game" class="menu-card">
+            <div class="menu-icon">🎮</div>
+            <div class="menu-title">게임/파티</div>
         </a>
-        <a href="board.html?category=hobby" class="menu-item">
-            <span class="icon">⚽</span> 취미
+        <a href="board.html?category=love" class="menu-card">
+            <div class="menu-icon">💌</div>
+            <div class="menu-title">연애/고백</div>
+        </a>
+        <a href="board.html?category=food" class="menu-card">
+            <div class="menu-icon">🍱</div>
+            <div class="menu-title">급식/매점</div>
+        </a>
+        <a href="board.html?category=qna" class="menu-card">
+            <div class="menu-icon">❓</div>
+            <div class="menu-title">질문/답변</div>
         </a>
     </main>
 </body>
