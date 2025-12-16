@@ -10,250 +10,120 @@
     <header class="header sticky">
         <a href="index.html" class="back-btn">❮</a>
         <h2 id="board-title">게시판</h2>
-        <button class="write-btn" onclick="openWriteModal()">글쓰기</button>
+        <button class="write-btn" onclick="document.getElementById('write-modal').classList.remove('hidden')">글쓰기</button>
     </header>
 
-    <main id="post-list" class="post-list">
-        </main>
+    <main id="post-list" class="post-list"></main>
 
     <div id="write-modal" class="modal hidden">
         <div class="modal-content">
             <h3>글쓰기</h3>
-            <input type="text" id="input-title" placeholder="제목" autocomplete="off">
-            <textarea id="input-content" placeholder="내용을 입력하세요"></textarea>
-            
-            <div class="form-options">
-                <label class="file-upload">
-                    📷 사진/영상
-                    <input type="file" id="input-file" accept="image/*, video/*">
-                </label>
-                <input type="password" id="input-password" placeholder="비밀번호(삭제용)" maxlength="4">
-            </div>
-
+            <input type="text" id="input-title" placeholder="제목">
+            <textarea id="input-content" placeholder="내용"></textarea>
+            <input type="password" id="input-password" placeholder="비밀번호(삭제용)" maxlength="4">
             <div class="modal-buttons">
-                <button onclick="closeWriteModal()" class="cancel-btn">취소</button>
-                <button onclick="savePost()" class="confirm-btn">등록</button>
+                <button onclick="document.getElementById('write-modal').classList.add('hidden')" class="cancel-btn">취소</button>
+                <button id="submit-btn" class="confirm-btn">등록</button>
             </div>
         </div>
     </div>
 
-    <div id="view-modal" class="modal hidden">
-        <div class="modal-content view-box">
-            <button onclick="closeViewModal()" class="close-x">✕</button>
-            
-            <div id="view-header">
-                <h2 id="view-title">제목</h2>
-                <span id="view-meta">익명 · 날짜</span>
-            </div>
+    <script type="module">
+        // -----------------------------------------------------------
+        // ▼▼▼ 아까 복사한 Firebase 설정을 아래에 붙여넣으세요 ▼▼▼
+        // -----------------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-            <div id="view-body">
-                <div id="view-media-area"></div> <p id="view-text">내용</p>
-            </div>
+        // 아래 const firebaseConfig 부분을 본인 것으로 바꿔야 합니다!
+        const firebaseConfig = {
+            apiKey: "AIzaSyBYhs32HhSXtCfTHjYDWs9-i_lCj7d8UTc",
+            authDomain: "gunwi-board.firebaseapp.com",
+            projectId: "gunwi-board",
+            storageBucket: "gunwi-board.firebasestorage.app",
+            messagingSenderId: "G-SVL5WXSXPK",
+            appId: "1:343912898114:web:611e8204b8a38cdd1c57db"
+        };
+        // -----------------------------------------------------------
 
-            <div class="action-buttons">
-                <button onclick="vote('like')" class="vote-btn">👍 <span id="cnt-like">0</span></button>
-                <button onclick="vote('dislike')" class="vote-btn">👎 <span id="cnt-dislike">0</span></button>
-            </div>
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-            <hr>
-
-            <div id="comment-list">
-                </div>
-
-            <div class="comment-input-box">
-                <input type="text" id="comment-text" placeholder="댓글 입력...">
-                <button onclick="addComment()">등록</button>
-            </div>
-
-            <button onclick="deletePost()" class="delete-post-btn">이 글 삭제</button>
-        </div>
-    </div>
-
-    <script>
         // URL에서 카테고리 가져오기
         const params = new URLSearchParams(window.location.search);
         const category = params.get('category') || 'free';
+        const collectionName = 'gunwi_' + category;
+        
         const categoryNames = { free: '자유', school: '학교', game: '게임', hobby: '취미' };
         document.getElementById('board-title').innerText = categoryNames[category] || '게시판';
 
-        let currentPostId = null;
-
-        // 데이터 가져오기
-        function getData() {
-            return JSON.parse(localStorage.getItem('gunwi_' + category)) || [];
-        }
-        function saveData(data) {
-            localStorage.setItem('gunwi_' + category, JSON.stringify(data));
-        }
-
-        // 1. 게시글 목록 렌더링
-        function renderList() {
+        // 1. 게시글 불러오기 (Firebase에서)
+        async function loadPosts() {
             const list = document.getElementById('post-list');
-            const data = getData();
+            list.innerHTML = '로딩중...';
+            
+            const q = query(collection(db, collectionName), orderBy("date", "desc"));
+            const querySnapshot = await getDocs(q);
+            
             list.innerHTML = '';
-
-            // 최신순 정렬
-            data.sort((a, b) => b.id - a.id).forEach(post => {
+            querySnapshot.forEach((docSnap) => {
+                const post = docSnap.data();
                 const item = document.createElement('div');
                 item.className = 'post-item';
-                item.onclick = () => openViewModal(post.id);
-                
-                // 사진 있는지 확인
-                const hasMedia = post.media ? '<span class="media-badge">📷</span>' : '';
-
                 item.innerHTML = `
                     <div class="post-info">
-                        <span class="post-item-title">${post.title} ${hasMedia}</span>
-                        <span class="post-item-meta">익명${post.anonId} · 👍 ${post.likes}</span>
+                        <span class="post-item-title">${post.title}</span>
+                        <span class="post-item-meta">익명 · ${new Date(post.date).toLocaleDateString()}</span>
                     </div>
+                    <button class="delete-btn-small" data-id="${docSnap.id}" data-pw="${post.password}">삭제</button>
                 `;
                 list.appendChild(item);
             });
-        }
 
-        // 2. 글쓰기 관련
-        function openWriteModal() { document.getElementById('write-modal').classList.remove('hidden'); }
-        function closeWriteModal() { document.getElementById('write-modal').classList.add('hidden'); }
-
-        function savePost() {
-            const title = document.getElementById('input-title').value;
-            const content = document.getElementById('input-content').value;
-            const pw = document.getElementById('input-password').value;
-            const fileInput = document.getElementById('input-file');
-
-            if (!title || !content || !pw) {
-                alert("제목, 내용, 비밀번호를 모두 입력하세요.");
-                return;
-            }
-
-            const processPost = (mediaData) => {
-                const data = getData();
-                const newId = Date.now(); // 고유 ID로 시간 사용
-                const post = {
-                    id: newId,
-                    anonId: Math.floor(Math.random() * 1000) + 1, // 랜덤 익명 번호
-                    title,
-                    content,
-                    password: pw,
-                    media: mediaData, // 이미지 데이터 (Base64)
-                    likes: 0,
-                    dislikes: 0,
-                    date: new Date().toLocaleDateString(),
-                    comments: []
-                };
-                data.push(post);
-                saveData(data);
-                closeWriteModal();
-                renderList();
-                // 입력창 초기화
-                document.getElementById('input-title').value = '';
-                document.getElementById('input-content').value = '';
-                document.getElementById('input-password').value = '';
-                fileInput.value = '';
-            };
-
-            // 이미지 처리 (Base64 변환)
-            if (fileInput.files && fileInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    processPost(e.target.result);
-                };
-                reader.readAsDataURL(fileInput.files[0]);
-            } else {
-                processPost(null);
-            }
-        }
-
-        // 3. 상세 보기 관련
-        function openViewModal(id) {
-            currentPostId = id;
-            const data = getData();
-            const post = data.find(p => p.id === id);
-            
-            document.getElementById('view-title').innerText = post.title;
-            document.getElementById('view-meta').innerText = `익명${post.anonId} · ${post.date}`;
-            document.getElementById('view-text').innerText = post.content;
-            document.getElementById('cnt-like').innerText = post.likes;
-            document.getElementById('cnt-dislike').innerText = post.dislikes;
-
-            const mediaArea = document.getElementById('view-media-area');
-            mediaArea.innerHTML = '';
-            if (post.media) {
-                if (post.media.startsWith('data:video')) {
-                    mediaArea.innerHTML = `<video src="${post.media}" controls style="max-width:100%"></video>`;
-                } else {
-                    mediaArea.innerHTML = `<img src="${post.media}" style="max-width:100%">`;
-                }
-            }
-
-            renderComments(post.comments);
-            document.getElementById('view-modal').classList.remove('hidden');
-        }
-
-        function closeViewModal() { document.getElementById('view-modal').classList.add('hidden'); }
-
-        // 4. 좋아요/싫어요 기능
-        function vote(type) {
-            const data = getData();
-            const postIndex = data.findIndex(p => p.id === currentPostId);
-            if (postIndex === -1) return;
-
-            if (type === 'like') data[postIndex].likes++;
-            else data[postIndex].dislikes++;
-
-            saveData(data);
-            // 화면 갱신
-            document.getElementById('cnt-like').innerText = data[postIndex].likes;
-            document.getElementById('cnt-dislike').innerText = data[postIndex].dislikes;
-            renderList(); // 목록의 숫자도 갱신
-        }
-
-        // 5. 삭제 기능 (비밀번호 확인)
-        function deletePost() {
-            const pw = prompt("글 작성 시 설정한 비밀번호를 입력하세요:");
-            if (!pw) return;
-
-            const data = getData();
-            const postIndex = data.findIndex(p => p.id === currentPostId);
-            
-            if (data[postIndex].password === pw) {
-                data.splice(postIndex, 1);
-                saveData(data);
-                alert("삭제되었습니다.");
-                closeViewModal();
-                renderList();
-            } else {
-                alert("비밀번호가 틀렸습니다.");
-            }
-        }
-
-        // 6. 댓글 기능
-        function renderComments(comments) {
-            const list = document.getElementById('comment-list');
-            list.innerHTML = '';
-            comments.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'comment-item';
-                div.innerHTML = `<b>익명</b> ${c}`;
-                list.appendChild(div);
+            // 삭제 버튼 이벤트 연결
+            document.querySelectorAll('.delete-btn-small').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const pw = prompt("글 작성 시 비밀번호를 입력하세요:");
+                    if (pw === e.target.dataset.pw) {
+                        await deleteDoc(doc(db, collectionName, e.target.dataset.id));
+                        alert("삭제됨!");
+                        loadPosts();
+                    } else {
+                        alert("비번 틀림!");
+                    }
+                });
             });
         }
 
-        function addComment() {
-            const text = document.getElementById('comment-text').value;
-            if (!text) return;
+        // 2. 글 저장하기 (Firebase로)
+        document.getElementById('submit-btn').addEventListener('click', async () => {
+            const title = document.getElementById('input-title').value;
+            const content = document.getElementById('input-content').value;
+            const password = document.getElementById('input-password').value;
 
-            const data = getData();
-            const postIndex = data.findIndex(p => p.id === currentPostId);
-            data[postIndex].comments.push(text);
-            saveData(data);
-            
-            document.getElementById('comment-text').value = '';
-            renderComments(data[postIndex].comments);
-        }
+            if (!title || !content || !password) return alert("다 입력해주세요");
 
-        // 초기 실행
-        renderList();
+            try {
+                await addDoc(collection(db, collectionName), {
+                    title: title,
+                    content: content,
+                    password: password,
+                    date: Date.now()
+                });
+                alert("등록 완료!");
+                document.getElementById('write-modal').classList.add('hidden');
+                document.getElementById('input-title').value = '';
+                document.getElementById('input-content').value = '';
+                document.getElementById('input-password').value = '';
+                loadPosts(); // 목록 새로고침
+            } catch (e) {
+                console.error("Error: ", e);
+                alert("등록 실패! (콘솔 확인)");
+            }
+        });
+
+        // 시작하자마자 목록 불러오기
+        loadPosts();
     </script>
 </body>
 </html>
