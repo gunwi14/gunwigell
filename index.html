@@ -3,40 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>군위고 커뮤니티</title>
+    <title>군위고등학교 게시판</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header class="header">
-        <h2>🏫 군위고 라이프</h2>
-        <span style="font-size:12px; color:#888;">Beta</span>
+        <h2>🏫 군위고등학교 게시판</h2>
     </header>
 
     <main class="menu-grid">
         <a href="board.html?category=free" class="menu-card">
             <div class="menu-icon">💬</div>
             <div class="menu-title">자유게시판</div>
+            <span class="post-count" id="cnt-free">loading...</span>
         </a>
         <a href="board.html?category=school" class="menu-card">
             <div class="menu-icon">📚</div>
             <div class="menu-title">학교/학업</div>
+            <span class="post-count" id="cnt-school">loading...</span>
         </a>
         <a href="board.html?category=game" class="menu-card">
             <div class="menu-icon">🎮</div>
             <div class="menu-title">게임/파티</div>
+            <span class="post-count" id="cnt-game">loading...</span>
         </a>
         <a href="board.html?category=love" class="menu-card">
             <div class="menu-icon">💌</div>
             <div class="menu-title">연애/고백</div>
+            <span class="post-count" id="cnt-love">loading...</span>
         </a>
         <a href="board.html?category=food" class="menu-card">
             <div class="menu-icon">🍱</div>
             <div class="menu-title">급식/매점</div>
+            <span class="post-count" id="cnt-food">loading...</span>
         </a>
         <a href="board.html?category=qna" class="menu-card">
             <div class="menu-icon">❓</div>
             <div class="menu-title">질문/답변</div>
+            <span class="post-count" id="cnt-qna">loading...</span>
         </a>
     </main>
+
+    <script type="module">
+        // ▼▼▼ Firebase 설정 (board.html과 똑같은 키를 넣으세요!) ▼▼▼
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "본인_API_KEY",
+            authDomain: "본인_PROJECT.firebaseapp.com",
+            projectId: "본인_PROJECT_ID",
+            storageBucket: "본인_BUCKET",
+            messagingSenderId: "12345678",
+            appId: "1:1234:web:abcd"
+        };
+        // ▲▲▲ 여기까지 수정하세요 ▲▲▲
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const categories = ['free', 'school', 'game', 'love', 'food', 'qna'];
+
+        async function updateCounts() {
+            for (const cat of categories) {
+                try {
+                    const coll = collection(db, `gunwi_${cat}`);
+                    const snapshot = await getCountFromServer(coll);
+                    document.getElementById(`cnt-${cat}`).innerText = `${snapshot.data().count}개`;
+                } catch (e) {
+                    console.log(e);
+                    document.getElementById(`cnt-${cat}`).innerText = "-";
+                }
+            }
+        }
+        updateCounts();
+    </script>
 </body>
 </html>
